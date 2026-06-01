@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)
 const validatePhone = (phone: string) => {
   if (!phone) return true
@@ -24,6 +23,8 @@ export default function SignupPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+
+  const router = useRouter()
 
   const industries = ['Marketing & Advertising', 'Technology', 'Retail & E-commerce', 'Real Estate', 'Education', 'Healthcare', 'Finance', 'Agriculture', 'Hospitality', 'Other']
 
@@ -62,66 +63,75 @@ export default function SignupPage() {
     if (validateStep1()) setStep(2)
   }
 
+  const handleSubmit = async () => {
+    if (!validateStep2()) return
+    setSubmitting(true)
 
-
-// Inside the component add:
-const router = useRouter()
-
-// Replace handleSubmit:
-const handleSubmit = async () => {
-  if (!validateStep2()) return
-  setSubmitting(true)
-
-  try {
-    // 1. Create auth user in Supabase
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    })
-
-    if (authError) throw authError
-
-    // 2. Create organisation
-    const { data: orgData, error: orgError } = await supabase
-      .from('organisations')
-      .insert({
-        name: form.companyName,
+    try {
+      // 1. Create auth user in Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: form.email,
-        industry: form.industry,
-        website: form.website,
-        plan: form.plan,
-        status: 'trialing',
-        trial_start: new Date().toISOString(),
-        trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      })
-      .select()
-      .single()
-
-    if (orgError) throw orgError
-
-    // 3. Create user profile
-    const { error: userError } = await supabase
-      .from('users')
-      .insert({
-        auth_id: authData.user?.id,
-        organisation_id: orgData.id,
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        role: 'admin',
-        status: 'active',
+        password: form.password,
       })
 
-    if (userError) throw userError
+      if (authError) throw authError
 
-    setSubmitting(false)
-    setDone(true)
+      // 2. Create organisation
+      const { data: orgData, error: orgError } = await supabase
+        .from('organisations')
+        .insert({
+          name: form.companyName,
+          email: form.email,
+          industry: form.industry,
+          website: form.website,
+          plan: form.plan,
+          status: 'trialing',
+          trial_start: new Date().toISOString(),
+          trial_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        })
+        .select()
+        .single()
 
-  } catch (error: any) {
-    setSubmitting(false)
-    alert(error.message || 'Something went wrong. Please try again.')
+      if (orgError) throw orgError
+
+      // 3. Create user profile
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          auth_id: authData.user?.id,
+          organisation_id: orgData.id,
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          role: 'admin',
+          status: 'active',
+        })
+
+      if (userError) throw userError
+
+      // 4. Send signup confirmation email via Resend
+      const firstName = form.name.split(' ')[0]
+      const confirmUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`
+
+      await fetch('/api/email/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          firstName,
+          confirmUrl,
+        }),
+      })
+
+      setSubmitting(false)
+      setDone(true)
+
+    } catch (error: any) {
+      setSubmitting(false)
+      alert(error.message || 'Something went wrong. Please try again.')
+    }
   }
-}
+
   const inputStyle = {
     width: '100%', background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px',
@@ -298,9 +308,9 @@ const handleSubmit = async () => {
                     </div>
 
                     <button onClick={handleNext} style={{
-                    width: '100%', padding: '13px', borderRadius: '12px',
-background: 'rgba(0,255,136,0.15)', color: '#00ff88', fontSize: '14px',
-border: '1px solid rgba(0,255,136,0.35)', marginTop: '4px',
+                      width: '100%', padding: '13px', borderRadius: '12px',
+                      background: 'rgba(0,255,136,0.15)', color: '#00ff88', fontSize: '14px',
+                      border: '1px solid rgba(0,255,136,0.35)', marginTop: '4px', cursor: 'pointer',
                     }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,255,136,0.25)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,255,136,0.15)'}>
@@ -389,15 +399,15 @@ border: '1px solid rgba(0,255,136,0.35)', marginTop: '4px',
                         </div>
                         <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
                           I agree to the{' '}
-<a href="/terms" target="_blank" style={{ color: '#00ff88', textDecoration: 'none' }}>Terms of Service</a>
-{' '}and{' '}
-<a href="/privacy" target="_blank" style={{ color: '#00ff88', textDecoration: 'none' }}>Privacy Policy</a>
+                          <a href="/terms-of-service" target="_blank" style={{ color: '#00ff88', textDecoration: 'none' }}>Terms of Service</a>
+                          {' '}and{' '}
+                          <a href="/privacy-policy" target="_blank" style={{ color: '#00ff88', textDecoration: 'none' }}>Privacy Policy</a>
                         </span>
                       </div>
                       {errorText('agreeTerms')}
                     </div>
 
-                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                       <button onClick={() => { setStep(1); setErrors({}) }} style={{
                         flex: 1, padding: '13px', borderRadius: '12px', cursor: 'pointer',
                         background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)',
