@@ -111,7 +111,7 @@ export default function SignupPage() {
 
       // 4. Send signup confirmation email via Resend
       const firstName = form.name.split(' ')[0]
-      const confirmUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`
+      const confirmUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`
 
       await fetch('/api/email/signup', {
         method: 'POST',
