@@ -28,10 +28,34 @@ export default function SignupPage() {
 
   const industries = ['Marketing & Advertising', 'Technology', 'Retail & E-commerce', 'Real Estate', 'Education', 'Healthcare', 'Finance', 'Agriculture', 'Hospitality', 'Other']
 
+  // ---------------------------------------------------------------------------
+  // Plan definitions — updated pricing
+  // ---------------------------------------------------------------------------
   const plans = [
-    { id: 'starter', name: 'Starter', price: 'KES 1,500/mo', color: '#818cf8', desc: '1–2 users · 500 contacts' },
-    { id: 'growth', name: 'Growth', price: 'KES 3,500/mo', color: '#00ff88', desc: 'Up to 10 users · 5,000 contacts', popular: true },
-    { id: 'agency', name: 'Agency', price: 'KES 8,500/mo', color: '#fbbf24', desc: 'Unlimited users & contacts' },
+    {
+      id:      'starter',
+      name:    'Starter',
+      price:   'KES 3,500/mo',
+      color:   '#818cf8',
+      desc:    '1-3 users · 500 contacts · 500 SMS/month',
+      popular: false,
+    },
+    {
+      id:      'growth',
+      name:    'Growth',
+      price:   'KES 8,500/mo',
+      color:   '#00ff88',
+      desc:    'Up to 10 users · 5,000 contacts · 2,000 SMS/month',
+      popular: true,
+    },
+    {
+      id:      'enterprise',
+      name:    'Enterprise',
+      price:   'KES 16,500/mo',
+      color:   '#fbbf24',
+      desc:    'Unlimited users & contacts · 5,000 SMS/month',
+      popular: false,
+    },
   ]
 
   const validateStep1 = () => {
@@ -109,18 +133,14 @@ export default function SignupPage() {
 
       if (userError) throw userError
 
-      // 4. Send signup confirmation email via Resend
+      // 4. Fire and forget — send confirmation email without blocking signup
       const firstName = form.name.split(' ')[0]
       const confirmUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard`
 
-      await fetch('/api/email/signup', {
+      fetch('/api/email/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: form.email,
-          firstName,
-          confirmUrl,
-        }),
+        body: JSON.stringify({ email: form.email, firstName, confirmUrl }),
       })
 
       setSubmitting(false)
@@ -155,13 +175,9 @@ export default function SignupPage() {
       {/* Left panel */}
       <div style={{ width: '420px', flexShrink: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '60px 48px', position: 'relative', overflow: 'hidden' }}>
 
-        {/* Background glow */}
         <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(0,255,136,0.08), transparent 70%)', pointerEvents: 'none' }} />
-
-        {/* Grid */}
         <div style={{ position: 'absolute', inset: 0, opacity: 0.04, backgroundImage: 'linear-gradient(#00ff88 1px, transparent 1px), linear-gradient(90deg, #00ff88 1px, transparent 1px)', backgroundSize: '50px 50px', pointerEvents: 'none' }} />
 
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '56px', position: 'relative' }}>
           <div style={{ position: 'relative', width: 40, height: 40 }}>
             <Image src="/logo.webp" alt="Wave CRM" fill sizes="40px" style={{ objectFit: 'contain', borderRadius: '50%' }} />
@@ -178,7 +194,6 @@ export default function SignupPage() {
           No credit card required. Full access to all features for 7 days. Cancel anytime.
         </p>
 
-        {/* Benefits */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative' }}>
           {[
             '✓ Unlimited contacts during trial',
@@ -200,7 +215,6 @@ export default function SignupPage() {
         <div style={{ width: '100%', maxWidth: '480px' }}>
 
           {done ? (
-            /* Success */
             <div style={{ textAlign: 'center', padding: '48px 32px', borderRadius: '24px', background: 'rgba(10,20,10,0.9)', border: '1px solid rgba(0,255,136,0.2)' }}>
               <div style={{ fontSize: '64px', marginBottom: '20px' }}>🎉</div>
               <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'white', margin: '0 0 12px' }}>Account created!</h2>
@@ -213,20 +227,18 @@ export default function SignupPage() {
                 background: 'rgba(0,255,136,0.15)', color: '#00ff88', fontSize: '14px', fontWeight: 700,
                 textDecoration: 'none', border: '1px solid rgba(0,255,136,0.35)',
               }}>
-                Go to Dashboard →
+                Go to Dashboard
               </Link>
             </div>
           ) : (
             <div style={{ borderRadius: '24px', background: 'rgba(10,20,10,0.9)', border: '1px solid rgba(0,255,136,0.12)', overflow: 'hidden' }}>
 
-              {/* Progress bar */}
               <div style={{ height: '3px', background: 'rgba(255,255,255,0.06)' }}>
                 <div style={{ height: '100%', width: step === 1 ? '50%' : '100%', background: '#00ff88', transition: 'width 0.4s ease', borderRadius: '0 2px 2px 0' }} />
               </div>
 
               <div style={{ padding: '32px' }}>
 
-                {/* Header */}
                 <div style={{ marginBottom: '28px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                     <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontWeight: 500 }}>Step {step} of 2</span>
@@ -275,7 +287,6 @@ export default function SignupPage() {
                         onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
                     </div>
 
-                    {/* Plan selection */}
                     <div>
                       <label style={labelStyle}>Start with plan <span style={{ textTransform: 'none', fontWeight: 400 }}>(free for 7 days)</span></label>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -314,7 +325,7 @@ export default function SignupPage() {
                     }}
                       onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,255,136,0.25)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,255,136,0.15)'}>
-                      Continue →
+                      Continue
                     </button>
                   </div>
                 )}
@@ -375,7 +386,6 @@ export default function SignupPage() {
                       </div>
                     </div>
 
-                    {/* Password strength */}
                     {form.password && (
                       <div>
                         <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
@@ -390,7 +400,6 @@ export default function SignupPage() {
                       </div>
                     )}
 
-                    {/* Terms */}
                     <div>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}
                         onClick={() => { setForm({ ...form, agreeTerms: !form.agreeTerms }); setErrors({ ...errors, agreeTerms: '' }) }}>
@@ -412,7 +421,7 @@ export default function SignupPage() {
                         flex: 1, padding: '13px', borderRadius: '12px', cursor: 'pointer',
                         background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)',
                         fontSize: '14px', fontWeight: 600, border: '1px solid rgba(255,255,255,0.1)',
-                      }}>← Back</button>
+                      }}>Back</button>
                       <button onClick={handleSubmit} disabled={submitting} style={{
                         flex: 2, padding: '13px', borderRadius: '12px', cursor: 'pointer',
                         background: 'rgba(0,255,136,0.15)', color: '#00ff88', fontSize: '14px',
@@ -421,11 +430,10 @@ export default function SignupPage() {
                       }}
                         onMouseEnter={e => { if (!submitting) e.currentTarget.style.background = 'rgba(0,255,136,0.25)' }}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,255,136,0.15)'}>
-                        {submitting ? 'Creating account...' : '🚀 Start Free Trial'}
+                        {submitting ? 'Creating account...' : 'Start Free Trial'}
                       </button>
                     </div>
 
-                    {/* Login link */}
                     <p style={{ textAlign: 'center', fontSize: '13px', color: 'rgba(255,255,255,0.3)', marginTop: '20px', marginBottom: 0 }}>
                       Already have an account?{' '}
                       <Link href="/login" style={{ color: '#00ff88', textDecoration: 'none', fontWeight: 500 }}>Sign in</Link>

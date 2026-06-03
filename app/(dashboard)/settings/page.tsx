@@ -123,7 +123,7 @@ export default function SettingsPage() {
   })
 
   // Team state
-  const [team, setTeam]             = useState<TeamMember[]>([])
+  const [team, setTeam]               = useState<TeamMember[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole]   = useState<'admin' | 'manager' | 'agent'>('agent')
   const [inviting, setInviting]       = useState(false)
@@ -269,9 +269,9 @@ export default function SettingsPage() {
 
   const handleChangePassword = async () => {
     setPasswordError('')
-    if (!newPassword)                          { setPasswordError('Enter a new password'); return }
-    if (newPassword.length < 8)                { setPasswordError('Password must be at least 8 characters'); return }
-    if (newPassword !== confirmPassword)        { setPasswordError('Passwords do not match'); return }
+    if (!newPassword)                     { setPasswordError('Enter a new password'); return }
+    if (newPassword.length < 8)           { setPasswordError('Password must be at least 8 characters'); return }
+    if (newPassword !== confirmPassword)  { setPasswordError('Passwords do not match'); return }
 
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword })
@@ -328,10 +328,10 @@ export default function SettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email:         inviteEmail,
-          role:          inviteRole,
+          email:          inviteEmail,
+          role:           inviteRole,
           organisationId: company.id,
-          invitedByName: profile.name || 'Your admin',
+          invitedByName:  profile.name || 'Your admin',
         }),
       })
 
@@ -444,7 +444,7 @@ export default function SettingsPage() {
   }
 
   const planColors: Record<string, string> = {
-    starter: '#818cf8', growth: '#00ff88', agency: '#fbbf24',
+    starter: '#818cf8', growth: '#00ff88', enterprise: '#fbbf24',
   }
 
   const daysLeft = billing.trialEnd
@@ -729,7 +729,6 @@ export default function SettingsPage() {
               {/* Members tab */}
               {activeTeamTab === 'members' && (
                 <div>
-                  {/* Invite form — only visible to admins */}
                   {isAdmin && (
                     <Card>
                       <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: '0 0 16px' }}>
@@ -767,7 +766,6 @@ export default function SettingsPage() {
                     </Card>
                   )}
 
-                  {/* Team member list */}
                   <Card>
                     <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: '0 0 16px' }}>
                       {team.length} {team.length === 1 ? 'member' : 'members'}
@@ -778,27 +776,16 @@ export default function SettingsPage() {
                           key={member.id}
                           style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
                         >
-                          {/* Avatar initials */}
                           <div style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, background: `${roleColors[member.role]}18`, color: roleColors[member.role], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700 }}>
                             {member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?'}
                           </div>
-
-                          {/* Name and email */}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>
-                              {member.name || member.email}
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-                              {member.email}
-                            </div>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{member.name || member.email}</div>
+                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>{member.email}</div>
                           </div>
-
-                          {/* Status / joined date */}
                           <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
                             {member.status === 'invited' ? 'Invite pending' : `Joined ${member.joined}`}
                           </div>
-
-                          {/* Role selector (admin only) or role badge */}
                           {isAdmin ? (
                             <select
                               value={member.role}
@@ -814,8 +801,6 @@ export default function SettingsPage() {
                               {member.role}
                             </span>
                           )}
-
-                          {/* Remove button — admins cannot remove themselves */}
                           {isAdmin && member.id !== profile.id && (
                             <button
                               onClick={() => handleRemove(member.id)}
@@ -843,7 +828,6 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div>
-                      {/* Role tab switcher */}
                       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
                         {(['Manager', 'Agent'] as const).map(role => (
                           <button
@@ -856,7 +840,6 @@ export default function SettingsPage() {
                         ))}
                       </div>
 
-                      {/* Permission toggles */}
                       <Card>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           {allPermissions.map((perm, i) => {
@@ -867,12 +850,8 @@ export default function SettingsPage() {
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderRadius: '10px', background: enabled ? `${roleColors[activePermRole.toLowerCase()]}06` : 'transparent', borderBottom: i < allPermissions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
                               >
                                 <div style={{ flex: 1, minWidth: 0, marginRight: '16px' }}>
-                                  <div style={{ fontSize: '13px', fontWeight: 600, color: enabled ? 'white' : 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>
-                                    {perm.label}
-                                  </div>
-                                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
-                                    {perm.desc}
-                                  </div>
+                                  <div style={{ fontSize: '13px', fontWeight: 600, color: enabled ? 'white' : 'rgba(255,255,255,0.5)', marginBottom: '2px' }}>{perm.label}</div>
+                                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{perm.desc}</div>
                                 </div>
                                 <Toggle value={enabled} onChange={() => togglePermission(activePermRole, perm.key)} />
                               </div>
@@ -881,11 +860,8 @@ export default function SettingsPage() {
                         </div>
                       </Card>
 
-                      {/* Quick presets */}
                       <Card>
-                        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: '0 0 12px' }}>
-                          Quick Presets
-                        </h3>
+                        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: '0 0 12px' }}>Quick Presets</h3>
                         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => setRolePermissions({ ...rolePermissions, [activePermRole]: Object.fromEntries(allPermissions.map(p => [p.key, true])) as any })}
@@ -946,7 +922,6 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              {/* Trial banner */}
               {billing.status === 'trialing' && (
                 <Card>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -965,7 +940,6 @@ export default function SettingsPage() {
                 </Card>
               )}
 
-              {/* Active subscription banner */}
               {billing.status === 'active' && (
                 <Card>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -979,7 +953,7 @@ export default function SettingsPage() {
                 </Card>
               )}
 
-              {/* Current plan */}
+              {/* Current plan — updated pricing */}
               <Card>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
@@ -988,9 +962,11 @@ export default function SettingsPage() {
                       {billing.plan}
                     </div>
                     <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
-                      {billing.plan === 'starter' ? 'KES 1,500/mo · 1-2 users · 500 contacts' :
-                       billing.plan === 'growth'  ? 'KES 3,500/mo · Up to 10 users · 5,000 contacts' :
-                                                    'KES 8,500/mo · Unlimited users & contacts'}
+                      {billing.plan === 'starter'
+                        ? 'KES 3,500/mo · 1-3 users · 500 contacts · 500 SMS/month'
+                        : billing.plan === 'growth'
+                        ? 'KES 8,500/mo · Up to 10 users · 5,000 contacts · 2,000 SMS/month'
+                        : 'KES 16,500/mo · Unlimited users & contacts · 5,000 SMS/month'}
                     </div>
                   </div>
                   <a
@@ -1002,15 +978,13 @@ export default function SettingsPage() {
                 </div>
               </Card>
 
-              {/* Payment methods */}
               <Card>
                 <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'white', margin: '0 0 16px' }}>
                   Payment Method
                 </h3>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   {[
-                    { label: 'Card (Stripe)', desc: 'Visa, Mastercard' },
-                    { label: 'M-Pesa',        desc: 'Safaricom Daraja' },
+                    { label: 'M-Pesa', desc: 'Safaricom Daraja' },
                   ].map(method => (
                     <div
                       key={method.label}
@@ -1066,13 +1040,13 @@ export default function SettingsPage() {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {[
-                    { key: 'newLead',       label: 'A new lead is added',          desc: 'Get notified when a contact is added' },
-                    { key: 'taskDue',       label: 'A task is due today',           desc: 'Daily reminder for due tasks' },
-                    { key: 'taskOverdue',   label: 'A task is overdue',             desc: 'Alert when tasks pass their due date' },
-                    { key: 'dealConverted', label: 'A deal is converted',           desc: 'Notification for every converted deal' },
-                    { key: 'campaignSent',  label: 'A campaign is sent',            desc: 'Confirmation when campaigns go out' },
-                    { key: 'teamActivity',  label: 'Team member activity',          desc: 'When teammates add or update leads' },
-                    { key: 'weeklyReport',  label: 'Weekly performance report',     desc: 'Summary every Monday morning' },
+                    { key: 'newLead',       label: 'A new lead is added',       desc: 'Get notified when a contact is added' },
+                    { key: 'taskDue',       label: 'A task is due today',        desc: 'Daily reminder for due tasks' },
+                    { key: 'taskOverdue',   label: 'A task is overdue',          desc: 'Alert when tasks pass their due date' },
+                    { key: 'dealConverted', label: 'A deal is converted',        desc: 'Notification for every converted deal' },
+                    { key: 'campaignSent',  label: 'A campaign is sent',         desc: 'Confirmation when campaigns go out' },
+                    { key: 'teamActivity',  label: 'Team member activity',       desc: 'When teammates add or update leads' },
+                    { key: 'weeklyReport',  label: 'Weekly performance report',  desc: 'Summary every Monday morning' },
                   ].map(item => (
                     <div key={item.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <div>
@@ -1185,9 +1159,7 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: 'white' }}>Supabase</div>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
-                      Database · Auth · Realtime · Storage
-                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Database · Auth · Realtime · Storage</div>
                   </div>
                   <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '20px', fontWeight: 600, background: 'rgba(0,255,136,0.15)', color: '#00ff88' }}>
                     Connected
