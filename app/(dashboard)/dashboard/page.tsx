@@ -5,6 +5,9 @@ import Sidebar from '@/components/sidebar'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/auth'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type Stat = {
   label: string
   value: string | number
@@ -32,36 +35,44 @@ type Task = {
   done: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 const priorityColors: Record<string, string> = {
   high: '#ff6b6b', medium: '#fbbf24', low: '#00ff88',
 }
 
 const timeAgo = (date: string) => {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-  if (seconds < 60) return 'Just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 60)    return 'Just now'
+  if (seconds < 3600)  return `${Math.floor(seconds / 60)}m ago`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export default function DashboardPage() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(true)
-  const [firstName, setFirstName] = useState('')
-  const [orgName, setOrgName] = useState('')
-  const [stats, setStats] = useState<Stat[]>([])
-  const [recentLeads, setRecentLeads] = useState<RecentLead[]>([])
-  const [todayTasks, setTodayTasks] = useState<Task[]>([])
-  const [pipelineOverview, setPipelineOverview] = useState<{
-    label: string
-    count: number
-    value: number
-    color: string
-  }[]>([])
+  const { user }                                    = useAuth()
+  const [loading,          setLoading]          = useState(true)
+  const [firstName,        setFirstName]        = useState('')
+  const [orgName,          setOrgName]          = useState('')
+  const [stats,            setStats]            = useState<Stat[]>([])
+  const [recentLeads,      setRecentLeads]      = useState<RecentLead[]>([])
+  const [todayTasks,       setTodayTasks]       = useState<Task[]>([])
+  const [pipelineOverview, setPipelineOverview] = useState<{ label: string; count: number; value: number; color: string }[]>([])
+  const [isMobile,         setIsMobile]         = useState(false)
 
+  // Detect mobile
   useEffect(() => {
-    fetchDashboardData()
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
+
+  useEffect(() => { fetchDashboardData() }, [])
 
   const fetchDashboardData = async () => {
     setLoading(true)
@@ -70,27 +81,17 @@ export default function DashboardPage() {
       if (!authUser) return
 
       const { data: userProfile } = await supabase
-        .from('users')
-        .select('*, organisations(*)')
-        .eq('auth_id', authUser.id)
-        .single()
+        .from('users').select('*, organisations(*)')
+        .eq('auth_id', authUser.id).single()
 
       if (!userProfile) return
 
-      const orgId = userProfile.organisation_id
+      const orgId    = userProfile.organisation_id
       const fullName = userProfile.name || ''
       setFirstName(fullName.split(' ')[0] || 'there')
       setOrgName((userProfile.organisations as any)?.name || 'your organisation')
 
-      // Run all queries in parallel
-      const [
-        contactsRes,
-        leadsRes,
-        tasksRes,
-        stagesRes,
-        campaignsRes,
-        messagesRes,
-      ] = await Promise.all([
+      const [contactsRes, leadsRes, tasksRes, stagesRes, campaignsRes, messagesRes] = await Promise.all([
         supabase.from('contacts').select('id, created_at').eq('organisation_id', orgId),
         supabase.from('leads').select('id, value, stage_id, created_at, converted_at').eq('organisation_id', orgId),
         supabase.from('tasks').select('*').eq('organisation_id', orgId),
@@ -99,36 +100,31 @@ export default function DashboardPage() {
         supabase.from('messages').select('id, read, direction').eq('organisation_id', orgId),
       ])
 
-      const contacts = contactsRes.data || []
-      const leads = leadsRes.data || []
-      const tasks = tasksRes.data || []
-      const stages = stagesRes.data || []
+      const contacts  = contactsRes.data  || []
+      const leads     = leadsRes.data     || []
+      const tasks     = tasksRes.data     || []
+      const stages    = stagesRes.data    || []
       const campaigns = campaignsRes.data || []
-      const msgs = messagesRes.data || []
+      const msgs      = messagesRes.data  || []
 
-      // Calculate stats
-      const totalContacts = contacts.length
-      const totalLeads = leads.length
-      const convertedLeads = leads.filter(l => l.converted_at)
-      const conversionRate = totalLeads > 0 ? Math.round((convertedLeads.length / totalLeads) * 100) : 0
-      const totalRevenue = convertedLeads.reduce((s, l) => s + (l.value || 0), 0)
-      const tasksDueToday = tasks.filter(t => t.due_date === 'Today' && !t.done).length
-      const unreadMessages = msgs.filter(m => !m.read && m.direction === 'inbound').length
-      const totalCampaignsSent = campaigns.reduce((s, c) => s + (c.sent || 0), 0)
-
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      const convertedLeads      = leads.filter(l => l.converted_at)
+      const conversionRate      = leads.length > 0 ? Math.round((convertedLeads.length / leads.length) * 100) : 0
+      const totalRevenue        = convertedLeads.reduce((s, l) => s + (l.value || 0), 0)
+      const tasksDueToday       = tasks.filter(t => t.due_date === 'Today' && !t.done).length
+      const unreadMessages      = msgs.filter(m => !m.read && m.direction === 'inbound').length
+      const totalCampaignsSent  = campaigns.reduce((s, c) => s + (c.sent || 0), 0)
+      const weekAgo             = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       const newContactsThisWeek = contacts.filter(c => new Date(c.created_at) > weekAgo).length
 
       setStats([
-        { label: 'Total Contacts', value: totalContacts, change: `+${newContactsThisWeek} this week`, color: '#818cf8', icon: '👥' },
-        { label: 'Active Leads', value: totalLeads, change: `${conversionRate}% conversion rate`, color: '#38bdf8', icon: '📊' },
-        { label: 'Revenue (KES)', value: `${(totalRevenue / 1000).toFixed(0)}K`, change: `${convertedLeads.length} deals closed`, color: '#00ff88', icon: '💰' },
-        { label: 'Tasks Due Today', value: tasksDueToday, change: `${tasks.filter(t => t.done).length} completed`, color: '#fbbf24', icon: '✓' },
-        { label: 'Unread Messages', value: unreadMessages, change: `${msgs.length} total messages`, color: '#f97316', icon: '💬' },
-        { label: 'Campaigns Sent', value: totalCampaignsSent, change: `${campaigns.length} campaigns`, color: '#a78bfa', icon: '📣' },
+        { label: 'Total Contacts',   value: contacts.length,                           change: `+${newContactsThisWeek} this week`,         color: '#818cf8', icon: '👥' },
+        { label: 'Active Leads',     value: leads.length,                              change: `${conversionRate}% conversion rate`,         color: '#38bdf8', icon: '📊' },
+        { label: 'Revenue (KES)',    value: `${(totalRevenue / 1000).toFixed(0)}K`,    change: `${convertedLeads.length} deals closed`,      color: '#00ff88', icon: '💰' },
+        { label: 'Tasks Due Today',  value: tasksDueToday,                             change: `${tasks.filter(t => t.done).length} done`,   color: '#fbbf24', icon: '✓' },
+        { label: 'Unread Messages',  value: unreadMessages,                            change: `${msgs.length} total messages`,              color: '#f97316', icon: '💬' },
+        { label: 'Campaigns Sent',   value: totalCampaignsSent,                        change: `${campaigns.length} campaigns`,              color: '#a78bfa', icon: '📣' },
       ])
 
-      // Recent leads
       const { data: recentLeadsData } = await supabase
         .from('leads')
         .select('*, contacts(name, company), pipeline_stages(label, color)')
@@ -137,39 +133,32 @@ export default function DashboardPage() {
         .limit(6)
 
       setRecentLeads((recentLeadsData || []).map((l: any) => ({
-        id: l.id,
-        name: l.contacts?.name || 'Unknown',
-        company: l.contacts?.company || '',
-        value: l.value || 0,
-        stage: l.pipeline_stages?.label || 'Unknown',
+        id:         l.id,
+        name:       l.contacts?.name    || 'Unknown',
+        company:    l.contacts?.company || '',
+        value:      l.value             || 0,
+        stage:      l.pipeline_stages?.label || 'Unknown',
         stageColor: l.pipeline_stages?.color || '#818cf8',
-        time: timeAgo(l.created_at),
+        time:       timeAgo(l.created_at),
       })))
 
-      // Today's tasks
       setTodayTasks(
-        tasks
-          .filter(t => t.due_date === 'Today' && !t.done)
-          .slice(0, 5)
-          .map(t => ({
-            id: t.id,
-            title: t.title,
-            priority: t.priority || 'medium',
-            dueDate: t.due_date || '',
-            assignedTo: t.assigned_to || '',
-            done: t.done || false,
-          }))
+        tasks.filter(t => t.due_date === 'Today' && !t.done).slice(0, 5).map(t => ({
+          id:         t.id,
+          title:      t.title,
+          priority:   t.priority   || 'medium',
+          dueDate:    t.due_date   || '',
+          assignedTo: t.assigned_to || '',
+          done:       t.done        || false,
+        }))
       )
 
-      // Pipeline overview
       setPipelineOverview(
         stages.map(stage => ({
           label: stage.label,
           color: stage.color,
           count: leads.filter(l => l.stage_id === stage.id).length,
-          value: leads
-            .filter(l => l.stage_id === stage.id)
-            .reduce((s, l) => s + (l.value || 0), 0),
+          value: leads.filter(l => l.stage_id === stage.id).reduce((s, l) => s + (l.value || 0), 0),
         }))
       )
 
@@ -186,22 +175,40 @@ export default function DashboardPage() {
     setTimeout(() => setTodayTasks(prev => prev.filter(t => t.id !== id)), 600)
   }
 
+  // Shared card style
+  const card = {
+    background: 'rgba(10,20,10,0.8)',
+    border: '0.5px solid rgba(0,255,136,0.1)',
+    borderRadius: '16px',
+    padding: '20px',
+  }
+
   return (
-    <div className="min-h-screen flex" style={{ background: '#080f08', color: 'white' }}>
+    <div style={{ minHeight: '100vh', background: '#080f08', color: 'white' }}>
       <Sidebar />
 
-      <div className="ml-60 flex-1 p-8 overflow-y-auto">
+      {/* Main content */}
+      <div style={{
+        marginLeft: isMobile ? 0 : '240px',
+        padding: isMobile ? '72px 16px 24px' : '32px',
+        overflowY: 'auto',
+      }}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        {/* ── Header ── */}
+        <div style={{
+          display: 'flex',
+          alignItems: isMobile ? 'flex-start' : 'center',
+          justifyContent: 'space-between',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: '12px',
+          marginBottom: '28px',
+        }}>
           <div>
-            <h1 className="text-2xl font-bold text-white">
-              Hey, {firstName} 👋
+            <h1 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: 'white', margin: 0 }}>
+              Hey, {firstName}
             </h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              {loading
-                ? 'Loading your dashboard...'
-                : `Here's what's happening at ${orgName} today`}
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', margin: '4px 0 0' }}>
+              {loading ? 'Loading your dashboard...' : `Here's what's happening at ${orgName} today`}
             </p>
           </div>
           <button
@@ -212,96 +219,98 @@ export default function DashboardPage() {
               background: 'rgba(255,255,255,0.04)',
               color: 'rgba(255,255,255,0.4)',
               cursor: 'pointer', fontSize: '12px', fontWeight: 500,
-            }}>
-            ↻ Refresh
+              width: isMobile ? '100%' : 'auto',
+            }}
+          >
+            Refresh
           </button>
         </div>
 
-        {/* Loading */}
+        {/* ── Loading ── */}
         {loading && (
-          <div className="flex items-center justify-center py-32">
-            <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.3)' }}>
-              Loading dashboard...
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+            <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.3)' }}>Loading dashboard...</span>
           </div>
         )}
 
         {!loading && (
           <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
+            {/* ── Stats Grid — 2 cols on mobile, 3 on desktop ── */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
+              gap: '12px',
+              marginBottom: '24px',
+            }}>
               {stats.map(stat => (
-                <div key={stat.label} className="rounded-2xl p-5 transition-all"
-                  style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}
+                <div
+                  key={stat.label}
+                  style={{ ...card, transition: 'border 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.25)'}
-                  onMouseLeave={e => e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.1)'}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="text-xs uppercase tracking-wider"
-                      style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  onMouseLeave={e => e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.1)'}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)' }}>
                       {stat.label}
                     </div>
-                    <span style={{ fontSize: '20px' }}>{stat.icon}</span>
+                    <span style={{ fontSize: '18px' }}>{stat.icon}</span>
                   </div>
-                  <div className="text-3xl font-bold mb-2" style={{ color: stat.color }}>
+                  <div style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: 700, color: stat.color, marginBottom: '6px' }}>
                     {stat.value}
                   </div>
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
                     {stat.change}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-3 gap-6">
+            {/* ── Main grid — stacked on mobile, 3-col on desktop ── */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
+              gap: '16px',
+            }}>
 
               {/* Recent Leads */}
-              <div className="col-span-2 rounded-2xl p-5"
-                style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-sm font-semibold text-white">Recent Leads</h2>
-                  <a href="/pipeline" className="text-xs"
-                    style={{ color: '#00ff88', textDecoration: 'none' }}>
-                    View all →
-                  </a>
+              <div style={card}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Recent Leads</h2>
+                  <a href="/pipeline" style={{ fontSize: '12px', color: '#00ff88', textDecoration: 'none' }}>View all</a>
                 </div>
 
                 {recentLeads.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <div style={{ fontSize: '32px', opacity: 0.2, marginBottom: '8px' }}>📊</div>
+                  <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                    <div style={{ fontSize: '28px', opacity: 0.2, marginBottom: '8px' }}>📊</div>
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>No leads yet</div>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', marginTop: '4px' }}>
-                      Add leads from the Pipeline page
-                    </div>
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', marginTop: '4px' }}>Add leads from the Pipeline page</div>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {recentLeads.map(lead => (
-                      <div key={lead.id}
-                        className="flex items-center justify-between p-3 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.06)' }}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                            style={{ background: `${lead.stageColor}15`, color: lead.stageColor }}>
+                      <div
+                        key={lead.id}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '12px', background: 'rgba(255,255,255,0.03)', border: '0.5px solid rgba(255,255,255,0.06)', flexWrap: isMobile ? 'wrap' : 'nowrap', gap: '8px' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, background: `${lead.stageColor}15`, color: lead.stageColor }}>
                             {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                           </div>
-                          <div>
-                            <div className="text-sm font-medium text-white">{lead.name}</div>
-                            <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                              {lead.company}
-                            </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name}</div>
+                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>{lead.company}</div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <span className="text-xs px-2.5 py-1 rounded-lg font-medium"
-                            style={{ background: `${lead.stageColor}15`, color: lead.stageColor }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                          <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '6px', fontWeight: 600, background: `${lead.stageColor}15`, color: lead.stageColor }}>
                             {lead.stage}
                           </span>
-                          <span className="text-sm font-bold" style={{ color: '#00ff88' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#00ff88' }}>
                             KES {lead.value.toLocaleString()}
                           </span>
-                          <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                            {lead.time}
-                          </span>
+                          {!isMobile && (
+                            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>{lead.time}</span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -309,49 +318,36 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Right column */}
-              <div className="flex flex-col gap-6">
+              {/* Right column — Tasks + Pipeline stacked */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                 {/* Tasks Today */}
-                <div className="rounded-2xl p-5"
-                  style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-white">Tasks Today</h2>
-                    <a href="/tasks" className="text-xs"
-                      style={{ color: '#00ff88', textDecoration: 'none' }}>
-                      View all →
-                    </a>
+                <div style={card}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Tasks Today</h2>
+                    <a href="/tasks" style={{ fontSize: '12px', color: '#00ff88', textDecoration: 'none' }}>View all</a>
                   </div>
 
                   {todayTasks.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <div style={{ fontSize: '28px', opacity: 0.2, marginBottom: '8px' }}>✓</div>
-                      <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
-                        No tasks due today
-                      </div>
+                    <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                      <div style={{ fontSize: '24px', opacity: 0.2, marginBottom: '8px' }}>✓</div>
+                      <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>No tasks due today</div>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {todayTasks.map(task => (
-                        <div key={task.id}
-                          className="flex items-start gap-3 p-2.5 rounded-lg"
-                          style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
                           <button
                             onClick={() => toggleTask(task.id)}
-                            className="mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
                             style={{
+                              marginTop: '2px', width: 18, height: 18, borderRadius: '5px', flexShrink: 0,
                               border: `1.5px solid ${priorityColors[task.priority] || '#00ff88'}`,
-                              background: 'transparent',
-                              cursor: 'pointer',
-                            }} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-white truncate">
-                              {task.title}
-                            </div>
-                            <div className="text-xs mt-0.5"
-                              style={{ color: priorityColors[task.priority] || '#00ff88' }}>
-                              {task.priority} priority
-                            </div>
+                              background: 'transparent', cursor: 'pointer',
+                            }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
+                            <div style={{ fontSize: '11px', marginTop: '2px', color: priorityColors[task.priority] || '#00ff88', textTransform: 'capitalize' }}>{task.priority} priority</div>
                           </div>
                         </div>
                       ))}
@@ -360,52 +356,34 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Pipeline Overview */}
-                <div className="rounded-2xl p-5"
-                  style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-sm font-semibold text-white">Pipeline</h2>
-                    <a href="/pipeline" className="text-xs"
-                      style={{ color: '#00ff88', textDecoration: 'none' }}>
-                      View →
-                    </a>
+                <div style={card}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Pipeline</h2>
+                    <a href="/pipeline" style={{ fontSize: '12px', color: '#00ff88', textDecoration: 'none' }}>View</a>
                   </div>
 
                   {pipelineOverview.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
-                        No pipeline data yet
-                      </div>
+                    <div style={{ padding: '24px 0', textAlign: 'center' }}>
+                      <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>No pipeline data yet</div>
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {pipelineOverview.map((stage, i) => {
-  const maxCount = Math.max(...pipelineOverview.map(s => s.count), 1)
-  return (
-    <div key={`${stage.label}-${i}`}>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full flex-shrink-0"
-                                  style={{ background: stage.color }} />
-                                <span className="text-xs text-white truncate" style={{ maxWidth: '96px' }}>
-                                  {stage.label}
-                                </span>
+                        const maxCount = Math.max(...pipelineOverview.map(s => s.count), 1)
+                        return (
+                          <div key={`${stage.label}-${i}`}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
+                                <span style={{ fontSize: '12px', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '110px' }}>{stage.label}</span>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold" style={{ color: stage.color }}>
-                                  {stage.count}
-                                </span>
-                                <span className="text-xs" style={{ color: 'rgba(255,255,255,0.25)' }}>
-                                  KES {(stage.value / 1000).toFixed(0)}K
-                                </span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: stage.color }}>{stage.count}</span>
+                                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>KES {(stage.value / 1000).toFixed(0)}K</span>
                               </div>
                             </div>
-                            <div className="h-1.5 rounded-full overflow-hidden"
-                              style={{ background: 'rgba(255,255,255,0.06)' }}>
-                              <div className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${(stage.count / maxCount) * 100}%`,
-                                  background: stage.color,
-                                }} />
+                            <div style={{ height: 6, borderRadius: '3px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', borderRadius: '3px', width: `${(stage.count / maxCount) * 100}%`, background: stage.color, transition: 'width 0.5s ease' }} />
                             </div>
                           </div>
                         )

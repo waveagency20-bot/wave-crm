@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Logo from '@/components/logo'
 import Sidebar from '@/components/sidebar'
 import { supabase } from '@/lib/supabase'
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type Contact = {
   id: string
   name: string
@@ -17,8 +19,12 @@ type Contact = {
   lastContact: string
 }
 
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 const sourceIcons: Record<string, string> = {
-  WhatsApp: '💬', 'Web Form': '🌐', Email: '📧', 'Social Media': '📱', Referral: '🤝', Import: '📂', manual: '✍️',
+  WhatsApp: '💬', 'Web Form': '🌐', Email: '📧',
+  'Social Media': '📱', Referral: '🤝', Import: '📂', manual: '✍️',
 }
 
 const sourceOptions = ['WhatsApp', 'Email', 'Web Form', 'Social Media', 'Referral']
@@ -44,32 +50,45 @@ const getInitials = (name: string) =>
 
 const timeAgo = (date: string) => {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-  if (seconds < 60) return 'Just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 60)    return 'Just now'
+  if (seconds < 3600)  return `${Math.floor(seconds / 60)}m ago`
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<string[]>([])
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [submitting, setSubmitting] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
-  const [importStep, setImportStep] = useState<'upload' | 'preview'>('upload')
-  const [importData, setImportData] = useState<any[]>([])
-  const [importing, setImporting] = useState(false)
+  const [contacts,    setContacts]    = useState<Contact[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [search,      setSearch]      = useState('')
+  const [selected,    setSelected]    = useState<string[]>([])
+  const [viewMode,    setViewMode]    = useState<'table' | 'cards'>('cards')
+  const [drawerOpen,  setDrawerOpen]  = useState(false)
+  const [form,        setForm]        = useState(emptyForm)
+  const [errors,      setErrors]      = useState<Record<string, string>>({})
+  const [submitting,  setSubmitting]  = useState(false)
+  const [importOpen,  setImportOpen]  = useState(false)
+  const [importStep,  setImportStep]  = useState<'upload' | 'preview'>('upload')
+  const [importData,  setImportData]  = useState<any[]>([])
+  const [importing,   setImporting]   = useState(false)
+  const [isMobile,    setIsMobile]    = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Load contacts from Supabase
+  // Detect mobile — default to cards view on mobile
   useEffect(() => {
-    fetchContacts()
+    const check = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      if (mobile) setViewMode('cards')
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
   }, [])
+
+  useEffect(() => { fetchContacts() }, [])
 
   const fetchContacts = async () => {
     setLoading(true)
@@ -78,30 +97,26 @@ export default function ContactsPage() {
       if (!user) return
 
       const { data: userProfile } = await supabase
-        .from('users')
-        .select('organisation_id')
-        .eq('auth_id', user.id)
-        .single()
+        .from('users').select('organisation_id').eq('auth_id', user.id).single()
 
       if (!userProfile) return
 
       const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
+        .from('contacts').select('*')
         .eq('organisation_id', userProfile.organisation_id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
       setContacts(data.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        company: c.company || '',
-        email: c.email || '',
-        phone: c.phone || '',
-        source: c.source || 'manual',
-        tags: c.tags || [],
-        assigned: c.assigned_to || '',
+        id:          c.id,
+        name:        c.name,
+        company:     c.company     || '',
+        email:       c.email       || '',
+        phone:       c.phone       || '',
+        source:      c.source      || 'manual',
+        tags:        c.tags        || [],
+        assigned:    c.assigned_to || '',
         lastContact: timeAgo(c.last_contact || c.created_at),
       })))
     } catch (err) {
@@ -112,13 +127,13 @@ export default function ContactsPage() {
   }
 
   const filtered = contacts.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.name.toLowerCase().includes(search.toLowerCase())    ||
     c.company.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase()) ||
+    c.email.toLowerCase().includes(search.toLowerCase())   ||
     c.assigned.toLowerCase().includes(search.toLowerCase())
   )
 
-  const toggleSelect = (id: string) =>
+  const toggleSelect  = (id: string) =>
     setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
 
   const toggleAll = () =>
@@ -126,13 +141,12 @@ export default function ContactsPage() {
 
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {}
-    if (!form.name) newErrors.name = 'Name is required'
-    if (!form.company) newErrors.company = 'Company is required'
-    if (!form.email) newErrors.email = 'Email is required'
+    if (!form.name)     newErrors.name     = 'Name is required'
+    if (!form.company)  newErrors.company  = 'Company is required'
+    if (!form.email)    newErrors.email    = 'Email is required'
     if (!form.assigned) newErrors.assigned = 'Please enter who this contact is assigned to'
     if (form.email && !validateEmail(form.email)) newErrors.email = 'Enter a valid email'
     if (form.phone && !validatePhone(form.phone)) newErrors.phone = 'Enter a valid Kenyan number e.g. 0712345678'
-
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return }
 
     setSubmitting(true)
@@ -141,10 +155,7 @@ export default function ContactsPage() {
       if (!user) throw new Error('Not authenticated')
 
       const { data: userProfile } = await supabase
-        .from('users')
-        .select('organisation_id, id')
-        .eq('auth_id', user.id)
-        .single()
+        .from('users').select('organisation_id, id').eq('auth_id', user.id).single()
 
       if (!userProfile) throw new Error('User profile not found')
 
@@ -152,31 +163,29 @@ export default function ContactsPage() {
         .from('contacts')
         .insert({
           organisation_id: userProfile.organisation_id,
-          name: form.name,
-          company: form.company,
-          email: form.email,
-          phone: form.phone,
-          source: form.source,
+          name:        form.name,
+          company:     form.company,
+          email:       form.email,
+          phone:       form.phone,
+          source:      form.source,
           assigned_to: form.assigned,
-          tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-          created_by: userProfile.id,
+          tags:        form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+          created_by:  userProfile.id,
           last_contact: new Date().toISOString(),
         })
-        .select()
-        .single()
+        .select().single()
 
       if (error) throw error
 
-      // Add to local state instantly
       setContacts(prev => [{
-        id: data.id,
-        name: data.name,
-        company: data.company || '',
-        email: data.email || '',
-        phone: data.phone || '',
-        source: data.source || 'manual',
-        tags: data.tags || [],
-        assigned: data.assigned_to || '',
+        id:          data.id,
+        name:        data.name,
+        company:     data.company     || '',
+        email:       data.email       || '',
+        phone:       data.phone       || '',
+        source:      data.source      || 'manual',
+        tags:        data.tags        || [],
+        assigned:    data.assigned_to || '',
         lastContact: 'Just now',
       }, ...prev])
 
@@ -184,9 +193,7 @@ export default function ContactsPage() {
       setErrors({})
       setSubmitting(false)
       setDrawerOpen(false)
-
     } catch (err: any) {
-      console.error('Error saving contact:', err)
       alert(err.message || 'Failed to save contact')
       setSubmitting(false)
     }
@@ -208,10 +215,7 @@ export default function ContactsPage() {
     const name = prompt('Assign to (enter full name):')
     if (!name) return
     try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({ assigned_to: name })
-        .in('id', selected)
+      const { error } = await supabase.from('contacts').update({ assigned_to: name }).in('id', selected)
       if (error) throw error
       setContacts(prev => prev.map(c => selected.includes(c.id) ? { ...c, assigned: name } : c))
       setSelected([])
@@ -250,11 +254,9 @@ export default function ContactsPage() {
       )
     ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'wave-crm-contacts.csv'
-    a.click()
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = 'wave-crm-contacts.csv'; a.click()
     URL.revokeObjectURL(url)
     setSelected([])
   }
@@ -264,17 +266,17 @@ export default function ContactsPage() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = (ev) => {
-      const text = ev.target?.result as string
-      const lines = text.split('\n').filter(Boolean)
+      const text    = ev.target?.result as string
+      const lines   = text.split('\n').filter(Boolean)
       const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-      const parsed = lines.slice(1).map((line, i) => {
+      const parsed  = lines.slice(1).map((line, i) => {
         const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
-        const get = (key: string) => values[headers.indexOf(key)] || ''
+        const get    = (key: string) => values[headers.indexOf(key)] || ''
         return {
-          name: get('name') || get('full name') || `Contact ${i + 1}`,
-          company: get('company') || '',
-          email: get('email') || '',
-          phone: get('phone') || get('mobile') || '',
+          name:     get('name') || get('full name') || `Contact ${i + 1}`,
+          company:  get('company')  || '',
+          email:    get('email')    || '',
+          phone:    get('phone')    || get('mobile') || '',
           assigned: get('assigned') || '',
         }
       }).filter(c => c.name)
@@ -291,23 +293,20 @@ export default function ContactsPage() {
       if (!user) throw new Error('Not authenticated')
 
       const { data: userProfile } = await supabase
-        .from('users')
-        .select('organisation_id, id')
-        .eq('auth_id', user.id)
-        .single()
+        .from('users').select('organisation_id, id').eq('auth_id', user.id).single()
 
       if (!userProfile) throw new Error('User profile not found')
 
       const inserts = importData.map(c => ({
         organisation_id: userProfile.organisation_id,
-        name: c.name,
-        company: c.company,
-        email: c.email,
-        phone: c.phone,
-        source: 'Import',
+        name:        c.name,
+        company:     c.company,
+        email:       c.email,
+        phone:       c.phone,
+        source:      'Import',
         assigned_to: c.assigned || '',
-        tags: ['Imported'],
-        created_by: userProfile.id,
+        tags:        ['Imported'],
+        created_by:  userProfile.id,
         last_contact: new Date().toISOString(),
       }))
 
@@ -320,7 +319,6 @@ export default function ContactsPage() {
       setImporting(false)
       setImportOpen(false)
       if (fileRef.current) fileRef.current.value = ''
-
     } catch (err: any) {
       alert(err.message || 'Failed to import contacts')
       setImporting(false)
@@ -344,250 +342,233 @@ export default function ContactsPage() {
     ? <p style={{ fontSize: '11px', color: '#ff6b6b', margin: '4px 0 0' }}>⚠ {errors[key]}</p>
     : null
 
+  const drawerWidth = isMobile ? '100%' : '440px'
+
   return (
-    <div className="min-h-screen flex" style={{ background: '#080f08', color: 'white' }}>
+    <div style={{ minHeight: '100vh', background: '#080f08', color: 'white' }}>
       <Sidebar />
 
-      <div className="ml-60 flex-1 p-8">
+      {/* Main content */}
+      <div style={{
+        marginLeft: isMobile ? 0 : '240px',
+        padding: isMobile ? '72px 16px 24px' : '32px',
+      }}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        {/* ── Header ── */}
+        <div style={{
+          display: 'flex', alignItems: isMobile ? 'flex-start' : 'center',
+          justifyContent: 'space-between',
+          flexDirection: isMobile ? 'column' : 'row',
+          gap: '12px', marginBottom: '24px',
+        }}>
           <div>
-            <h1 className="text-2xl font-bold text-white">Contacts & Leads</h1>
-            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <h1 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: 'white', margin: 0 }}>Contacts & Leads</h1>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', margin: '4px 0 0' }}>
               {loading ? 'Loading...' : `${contacts.length} total contacts`}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
             <button
               onClick={() => { setImportOpen(true); setImportStep('upload') }}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)' }}>
-              ↑ Import
+              style={{ flex: isMobile ? 1 : 'none', padding: '10px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 500, background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}
+            >
+              Import
             </button>
             <button
               onClick={() => { setForm(emptyForm); setErrors({}); setDrawerOpen(true) }}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold"
-              style={{ background: 'rgba(0,255,136,0.15)', border: '0.5px solid rgba(0,255,136,0.3)', color: '#00ff88' }}>
+              style={{ flex: isMobile ? 1 : 'none', padding: '10px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 600, background: 'rgba(0,255,136,0.15)', border: '0.5px solid rgba(0,255,136,0.3)', color: '#00ff88', cursor: 'pointer' }}
+            >
               + Add Contact
             </button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="relative flex-1 max-w-sm">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm"
-              style={{ color: 'rgba(255,255,255,0.3)' }}>🔍</span>
-            <input type="text" placeholder="Search contacts..." value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full rounded-xl pl-9 pr-4 py-2.5 text-sm text-white outline-none"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)' }}
+        {/* ── Search + View toggle ── */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', fontSize: '14px' }}>🔍</span>
+            <input
+              type="text" placeholder="Search contacts..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              style={{ ...inputStyle, paddingLeft: '36px' }}
               onFocus={e => e.target.style.borderColor = 'rgba(0,255,136,0.4)'}
-              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'} />
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+            />
           </div>
-          <div className="flex items-center gap-1 rounded-lg p-1"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.08)' }}>
-            {(['table', 'cards'] as const).map(v => (
-              <button key={v} onClick={() => setViewMode(v)}
-                className="px-3 py-1.5 rounded-md text-xs font-medium"
-                style={{
-                  background: viewMode === v ? 'rgba(0,255,136,0.15)' : 'transparent',
-                  color: viewMode === v ? '#00ff88' : 'rgba(255,255,255,0.4)',
-                }}>
-                {v === 'table' ? '☰ Table' : '⊞ Cards'}
-              </button>
-            ))}
-          </div>
+          {/* View toggle — hidden on mobile, always cards */}
+          {!isMobile && (
+            <div style={{ display: 'flex', gap: '4px', padding: '4px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.08)' }}>
+              {(['table', 'cards'] as const).map(v => (
+                <button key={v} onClick={() => setViewMode(v)}
+                  style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', border: 'none', background: viewMode === v ? 'rgba(0,255,136,0.15)' : 'transparent', color: viewMode === v ? '#00ff88' : 'rgba(255,255,255,0.4)' }}>
+                  {v === 'table' ? '☰ Table' : '⊞ Cards'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Bulk actions */}
+        {/* ── Bulk actions ── */}
         {selected.length > 0 && (
-          <div className="flex items-center gap-3 mb-4 px-4 py-3 rounded-xl"
-            style={{ background: 'rgba(0,255,136,0.08)', border: '0.5px solid rgba(0,255,136,0.2)' }}>
-            <span className="text-sm font-medium" style={{ color: '#00ff88' }}>{selected.length} selected</span>
-            <div className="flex items-center gap-2 ml-4">
-              <button onClick={handleAssignBulk}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
-                Assign
-              </button>
-              <button onClick={handleTagBulk}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
-                Tag
-              </button>
-              <button onClick={handleExport}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', border: '0.5px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>
-                Export
-              </button>
-              <button onClick={() => handleDelete(selected)}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                style={{ background: 'rgba(255,107,107,0.15)', color: '#ff6b6b', border: '0.5px solid rgba(255,107,107,0.2)', cursor: 'pointer' }}>
-                Delete
-              </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', padding: '12px 16px', borderRadius: '12px', background: 'rgba(0,255,136,0.08)', border: '0.5px solid rgba(0,255,136,0.2)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#00ff88' }}>{selected.length} selected</span>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[
+                { label: 'Assign',  action: handleAssignBulk, color: 'rgba(255,255,255,0.6)',  bg: 'rgba(255,255,255,0.08)' },
+                { label: 'Tag',     action: handleTagBulk,    color: 'rgba(255,255,255,0.6)',  bg: 'rgba(255,255,255,0.08)' },
+                { label: 'Export',  action: handleExport,     color: 'rgba(255,255,255,0.6)',  bg: 'rgba(255,255,255,0.08)' },
+                { label: 'Delete',  action: () => handleDelete(selected), color: '#ff6b6b', bg: 'rgba(255,107,107,0.15)' },
+              ].map(btn => (
+                <button key={btn.label} onClick={btn.action}
+                  style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, cursor: 'pointer', background: btn.bg, color: btn.color, border: 'none' }}>
+                  {btn.label}
+                </button>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Loading state */}
+        {/* ── Loading ── */}
         {loading && (
-          <div className="flex items-center justify-center py-24">
-            <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.3)' }}>Loading contacts...</div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
+            <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.3)' }}>Loading contacts...</span>
           </div>
         )}
 
-        {/* Table View */}
-        {!loading && viewMode === 'table' && (
-          <div className="rounded-2xl overflow-hidden"
-            style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}>
-            <table className="w-full">
-              <thead>
-                <tr style={{ borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
-                  <th className="px-4 py-3 text-left">
-                    <input type="checkbox"
-                      checked={selected.length === filtered.length && filtered.length > 0}
-                      onChange={toggleAll} />
-                  </th>
-                  {['Name', 'Source', 'Phone', 'Email', 'Tags', 'Assigned To', 'Last Contact', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs uppercase tracking-wider"
-                      style={{ color: 'rgba(255,255,255,0.3)' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(contact => (
-                  <tr key={contact.id} className="transition-all cursor-pointer"
-                    style={{ borderBottom: '0.5px solid rgba(255,255,255,0.04)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,255,136,0.03)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <td className="px-4 py-3">
-                      <input type="checkbox" checked={selected.includes(contact.id)}
-                        onChange={() => toggleSelect(contact.id)} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                          style={{ background: 'rgba(0,255,136,0.12)', color: '#00ff88' }}>
-                          {getInitials(contact.name)}
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-white">{contact.name}</div>
-                          <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{contact.company}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      {sourceIcons[contact.source] || '✍️'} {contact.source}
-                    </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      {contact.phone}
-                    </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      {contact.email}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {contact.tags.map(tag => (
-                          <span key={tag} className="text-xs px-2 py-0.5 rounded-md"
-                            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                          style={{ background: 'rgba(0,255,136,0.1)', color: '#00ff88' }}>
-                          {getInitials(contact.assigned || '?')}
-                        </div>
-                        <span className="text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                          {contact.assigned}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                      {contact.lastContact}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <button className="text-xs px-2.5 py-1.5 rounded-lg"
-                          style={{ background: 'rgba(0,255,136,0.1)', color: '#00ff88', border: '0.5px solid rgba(0,255,136,0.2)' }}>
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleDelete([contact.id])}
-                          className="text-xs px-2.5 py-1.5 rounded-lg"
-                          style={{ background: 'rgba(255,107,107,0.08)', color: 'rgba(255,107,107,0.6)', border: '0.5px solid rgba(255,107,107,0.1)' }}>
-                          🗑
-                        </button>
-                      </div>
-                    </td>
+        {/* ── Table View (desktop only) ── */}
+        {!loading && viewMode === 'table' && !isMobile && (
+          <div style={{ borderRadius: '16px', overflow: 'hidden', background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left' }}>
+                      <input type="checkbox"
+                        checked={selected.length === filtered.length && filtered.length > 0}
+                        onChange={toggleAll} />
+                    </th>
+                    {['Name', 'Source', 'Phone', 'Email', 'Tags', 'Assigned To', 'Last Contact', ''].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {filtered.length === 0 && !loading && (
-              <div className="py-16 text-center">
-                <div className="text-4xl mb-3">👥</div>
-                <div className="text-sm font-medium text-white">No contacts yet</div>
-                <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  Add your first contact to get started
-                </div>
+                </thead>
+                <tbody>
+                  {filtered.map(contact => (
+                    <tr key={contact.id}
+                      style={{ borderBottom: '0.5px solid rgba(255,255,255,0.04)', transition: 'background 0.1s', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,255,136,0.03)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <input type="checkbox" checked={selected.includes(contact.id)} onChange={() => toggleSelect(contact.id)} />
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, flexShrink: 0, background: 'rgba(0,255,136,0.12)', color: '#00ff88' }}>
+                            {getInitials(contact.name)}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '13px', fontWeight: 500, color: 'white' }}>{contact.name}</div>
+                            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>{contact.company}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{sourceIcons[contact.source] || '✍️'} {contact.source}</td>
+                      <td style={{ padding: '12px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{contact.phone}</td>
+                      <td style={{ padding: '12px 16px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{contact.email}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {contact.tags.map(tag => (
+                            <span key={tag} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}>{tag}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, background: 'rgba(0,255,136,0.1)', color: '#00ff88' }}>
+                            {getInitials(contact.assigned || '?')}
+                          </div>
+                          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>{contact.assigned}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{contact.lastContact}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button style={{ padding: '5px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, cursor: 'pointer', background: 'rgba(0,255,136,0.1)', color: '#00ff88', border: '0.5px solid rgba(0,255,136,0.2)' }}>View</button>
+                          <button onClick={() => handleDelete([contact.id])}
+                            style={{ padding: '5px 10px', borderRadius: '8px', fontSize: '11px', cursor: 'pointer', background: 'rgba(255,107,107,0.08)', color: 'rgba(255,107,107,0.6)', border: '0.5px solid rgba(255,107,107,0.1)' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,107,107,0.2)'; e.currentTarget.style.color = '#ff6b6b' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,107,107,0.08)'; e.currentTarget.style.color = 'rgba(255,107,107,0.6)' }}>
+                            🗑
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {filtered.length === 0 && (
+              <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>👥</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>No contacts yet</div>
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', marginTop: '6px' }}>Add your first contact to get started</div>
               </div>
             )}
           </div>
         )}
 
-        {/* Cards View */}
-        {!loading && viewMode === 'cards' && (
-          <div className="grid grid-cols-3 gap-4">
+        {/* ── Cards View (default on mobile, optional on desktop) ── */}
+        {!loading && (viewMode === 'cards' || isMobile) && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+            gap: '12px',
+          }}>
             {filtered.map(contact => (
-              <div key={contact.id} className="rounded-2xl p-5 cursor-pointer transition-all"
-                style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)' }}
-                onMouseEnter={e => (e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.3)')}
-                onMouseLeave={e => (e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.1)')}>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
-                      style={{ background: 'rgba(0,255,136,0.12)', color: '#00ff88' }}>
+              <div key={contact.id}
+                style={{ background: 'rgba(10,20,10,0.8)', border: '0.5px solid rgba(0,255,136,0.1)', borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'border 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.3)'}
+                onMouseLeave={e => e.currentTarget.style.border = '0.5px solid rgba(0,255,136,0.1)'}>
+
+                {/* Card header */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, background: 'rgba(0,255,136,0.12)', color: '#00ff88', flexShrink: 0 }}>
                       {getInitials(contact.name)}
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-white">{contact.name}</div>
-                      <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{contact.company}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>{contact.name}</div>
+                      <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }}>{contact.company}</div>
                     </div>
                   </div>
-                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                    {sourceIcons[contact.source] || '✍️'}
-                  </span>
+                  <span style={{ fontSize: '16px' }}>{sourceIcons[contact.source] || '✍️'}</span>
                 </div>
-                <div className="space-y-2 mb-4">
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>📧 {contact.email}</div>
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>📞 {contact.phone}</div>
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>👤 {contact.assigned}</div>
+
+                {/* Contact details */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                  {contact.email && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📧 {contact.email}</div>}
+                  {contact.phone && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>📞 {contact.phone}</div>}
+                  {contact.assigned && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>👤 {contact.assigned}</div>}
                 </div>
-                <div className="flex flex-wrap gap-1 mb-4">
-                  {contact.tags.map(tag => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded-md"
-                      style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between pt-3"
-                  style={{ borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
-                  <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{contact.lastContact}</span>
-                  <div className="flex gap-2">
-                    <button className="text-xs px-3 py-1.5 rounded-lg"
-                      style={{ background: 'rgba(0,255,136,0.1)', color: '#00ff88', border: '0.5px solid rgba(0,255,136,0.2)' }}>
-                      View
-                    </button>
+
+                {/* Tags */}
+                {contact.tags.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '12px' }}>
+                    {contact.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}>{tag}</span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '0.5px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{contact.lastContact}</span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button style={{ padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', background: 'rgba(0,255,136,0.1)', color: '#00ff88', border: '0.5px solid rgba(0,255,136,0.2)' }}>View</button>
                     <button onClick={() => handleDelete([contact.id])}
-                      className="text-xs px-3 py-1.5 rounded-lg"
-                      style={{ background: 'rgba(255,107,107,0.08)', color: 'rgba(255,107,107,0.6)', border: '0.5px solid rgba(255,107,107,0.1)' }}>
+                      style={{ padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', background: 'rgba(255,107,107,0.08)', color: 'rgba(255,107,107,0.6)', border: '0.5px solid rgba(255,107,107,0.1)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,107,107,0.2)'; e.currentTarget.style.color = '#ff6b6b' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,107,107,0.08)'; e.currentTarget.style.color = 'rgba(255,107,107,0.6)' }}>
                       🗑
                     </button>
                   </div>
@@ -595,41 +576,45 @@ export default function ContactsPage() {
               </div>
             ))}
             {filtered.length === 0 && (
-              <div className="col-span-3 py-16 text-center">
-                <div className="text-4xl mb-3">👥</div>
-                <div className="text-sm font-medium text-white">No contacts yet</div>
+              <div style={{ gridColumn: isMobile ? '1' : '1 / -1', padding: '64px 24px', textAlign: 'center', borderRadius: '16px', background: 'rgba(10,20,10,0.4)', border: '0.5px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '36px', marginBottom: '12px' }}>👥</div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>No contacts yet</div>
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', marginTop: '6px' }}>Add your first contact to get started</div>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Overlays */}
+      {/* ── Backdrop ── */}
       {(drawerOpen || importOpen) && (
         <div onClick={() => { setDrawerOpen(false); setImportOpen(false) }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200, backdropFilter: 'blur(4px)' }} />
       )}
 
-      {/* Add Contact Drawer */}
+      {/* ── Add Contact Drawer — full screen on mobile ── */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: '440px',
-        background: '#0a140a', borderLeft: '1px solid rgba(0,255,136,0.12)',
+        position: 'fixed', top: 0, right: 0, bottom: 0,
+        width: drawerWidth,
+        background: '#0a140a',
+        borderLeft: isMobile ? 'none' : '1px solid rgba(0,255,136,0.12)',
         zIndex: 300, display: 'flex', flexDirection: 'column',
         transform: drawerOpen ? 'translateX(0)' : 'translateX(100%)',
         transition: 'transform 0.3s cubic-bezier(0.22,1,0.36,1)',
         boxShadow: drawerOpen ? '-20px 0 60px rgba(0,0,0,0.5)' : 'none',
       }}>
-        <div style={{ padding: '24px 28px 20px', borderBottom: '1px solid rgba(0,255,136,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(0,255,136,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'white', margin: 0 }}>Add New Contact</h2>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'white', margin: 0 }}>Add New Contact</h2>
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', margin: '4px 0 0' }}>Fill in the contact details below</p>
           </div>
-          <button onClick={() => setDrawerOpen(false)} style={{ width: 32, height: 32, borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+          <button onClick={() => setDrawerOpen(false)} style={{ width: 36, height: 36, borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          {/* Name + Company — stacked on mobile */}
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
             <div>
               <label style={labelStyle}>Full Name *</label>
               <input style={{ ...inputStyle, borderColor: errors.name ? '#ff6b6b' : 'rgba(255,255,255,0.1)' }}
@@ -675,7 +660,7 @@ export default function ContactsPage() {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {sourceOptions.map(s => (
                 <button key={s} onClick={() => setForm({ ...form, source: s })} style={{
-                  padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                  padding: '7px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
                   background: form.source === s ? 'rgba(0,255,136,0.15)' : 'rgba(255,255,255,0.04)',
                   border: form.source === s ? '1px solid rgba(0,255,136,0.35)' : '1px solid rgba(255,255,255,0.08)',
                   color: form.source === s ? '#00ff88' : 'rgba(255,255,255,0.45)',
@@ -703,7 +688,7 @@ export default function ContactsPage() {
           </div>
         </div>
 
-        <div style={{ padding: '20px 28px', borderTop: '1px solid rgba(0,255,136,0.08)', display: 'flex', gap: '10px' }}>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,255,136,0.08)', display: 'flex', gap: '10px' }}>
           <button onClick={() => setDrawerOpen(false)} style={{ flex: 1, padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>Cancel</button>
           <button onClick={handleSubmit} disabled={submitting} style={{ flex: 2, padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', background: 'rgba(0,255,136,0.15)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', opacity: submitting ? 0.6 : 1 }}>
             {submitting ? 'Saving...' : '+ Save Contact'}
@@ -711,20 +696,29 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Import Modal */}
+      {/* ── Import Modal — full screen on mobile ── */}
       <div style={{
-        position: 'fixed', top: '50%', left: '50%',
-        transform: importOpen ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.95)',
-        width: '580px', background: '#0a140a', borderRadius: '20px',
-        border: '1px solid rgba(0,255,136,0.15)', zIndex: 300,
-        opacity: importOpen ? 1 : 0, pointerEvents: importOpen ? 'all' : 'none',
+        position: 'fixed',
+        top:    isMobile ? 0        : '50%',
+        left:   isMobile ? 0        : '50%',
+        right:  isMobile ? 0        : 'auto',
+        bottom: isMobile ? 0        : 'auto',
+        transform: isMobile ? 'none' : importOpen ? 'translate(-50%, -50%) scale(1)' : 'translate(-50%, -50%) scale(0.95)',
+        width:  isMobile ? '100%'   : '580px',
+        background: '#0a140a',
+        borderRadius: isMobile ? 0 : '20px',
+        border: '1px solid rgba(0,255,136,0.15)',
+        zIndex: 300,
+        opacity: importOpen ? 1 : 0,
+        pointerEvents: importOpen ? 'all' : 'none',
         transition: 'all 0.25s cubic-bezier(0.22,1,0.36,1)',
         boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
-        maxHeight: '80vh', display: 'flex', flexDirection: 'column',
+        maxHeight: isMobile ? '100%' : '80vh',
+        display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '24px 28px 20px', borderBottom: '1px solid rgba(0,255,136,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid rgba(0,255,136,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'white', margin: 0 }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: 'white', margin: 0 }}>
               {importStep === 'upload' ? 'Import Contacts' : `Preview — ${importData.length} contacts found`}
             </h2>
             <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', margin: '4px 0 0' }}>
@@ -732,23 +726,24 @@ export default function ContactsPage() {
             </p>
           </div>
           <button onClick={() => { setImportOpen(false); setImportStep('upload'); setImportData([]) }}
-            style={{ width: 32, height: 32, borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+            style={{ width: 36, height: 36, borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {importStep === 'upload' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div onClick={() => fileRef.current?.click()} style={{ border: '2px dashed rgba(0,255,136,0.25)', borderRadius: '16px', padding: '48px 24px', textAlign: 'center', cursor: 'pointer', background: 'rgba(0,255,136,0.03)' }}
+              <div onClick={() => fileRef.current?.click()}
+                style={{ border: '2px dashed rgba(0,255,136,0.25)', borderRadius: '16px', padding: '40px 24px', textAlign: 'center', cursor: 'pointer', background: 'rgba(0,255,136,0.03)' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(0,255,136,0.5)'; e.currentTarget.style.background = 'rgba(0,255,136,0.06)' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,255,136,0.25)'; e.currentTarget.style.background = 'rgba(0,255,136,0.03)' }}>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>📂</div>
-                <div style={{ fontSize: '15px', fontWeight: 600, color: 'white', marginBottom: '6px' }}>Click to upload CSV file</div>
+                <div style={{ fontSize: '15px', fontWeight: 600, color: 'white', marginBottom: '6px' }}>Tap to upload CSV file</div>
                 <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>Supports .csv with columns: name, company, email, phone, assigned</div>
                 <input ref={fileRef} type="file" accept=".csv" onChange={handleFileUpload} style={{ display: 'none' }} />
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expected CSV format</div>
-                <div style={{ fontSize: '12px', color: '#00ff88', fontFamily: 'monospace', background: 'rgba(0,255,136,0.05)', padding: '10px 14px', borderRadius: '8px', lineHeight: '1.8' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Expected CSV format</div>
+                <div style={{ fontSize: '12px', color: '#00ff88', fontFamily: 'monospace', background: 'rgba(0,255,136,0.05)', padding: '10px 14px', borderRadius: '8px', lineHeight: 1.8, overflowX: 'auto' }}>
                   name,company,email,phone,assigned<br />
                   John Kamau,Kamau Ltd,john@kamau.co.ke,0712345678,Mary Otieno
                 </div>
@@ -758,26 +753,28 @@ export default function ContactsPage() {
 
           {importStep === 'preview' && (
             <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                    {['Name', 'Company', 'Email', 'Phone', 'Assigned To'].map(h => (
-                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {importData.slice(0, 8).map((c, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                      <td style={{ padding: '10px 14px', fontSize: '13px', color: 'white', fontWeight: 500 }}>{c.name}</td>
-                      <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.company}</td>
-                      <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.email}</td>
-                      <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.phone}</td>
-                      <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.assigned}</td>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '500px' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      {['Name', 'Company', 'Email', 'Phone', 'Assigned'].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {importData.slice(0, 8).map((c, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td style={{ padding: '10px 14px', fontSize: '13px', color: 'white', fontWeight: 500 }}>{c.name}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.company}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.email}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.phone}</td>
+                        <td style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>{c.assigned}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               {importData.length > 8 && (
                 <div style={{ padding: '10px 14px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.02)', textAlign: 'center' }}>
                   + {importData.length - 8} more contacts
@@ -787,15 +784,18 @@ export default function ContactsPage() {
           )}
         </div>
 
-        <div style={{ padding: '16px 28px 24px', borderTop: '1px solid rgba(0,255,136,0.08)', display: 'flex', gap: '10px' }}>
+        <div style={{ padding: '16px 24px 20px', borderTop: '1px solid rgba(0,255,136,0.08)', display: 'flex', gap: '10px' }}>
           {importStep === 'preview' && (
-            <button onClick={() => { setImportStep('upload'); setImportData([]) }} style={{ flex: 1, padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>← Back</button>
+            <button onClick={() => { setImportStep('upload'); setImportData([]) }}
+              style={{ flex: 1, padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)' }}>
+              Back
+            </button>
           )}
           <button
             onClick={importStep === 'preview' ? handleImportConfirm : () => fileRef.current?.click()}
             disabled={importing || (importStep === 'preview' && importData.length === 0)}
-            style={{ flex: 2, padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', background: 'rgba(0,255,136,0.12)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', opacity: importing ? 0.6 : 1 }}>
-            {importing ? 'Importing...' : importStep === 'upload' ? '📂 Choose CSV File' : `✓ Import ${importData.length} Contacts`}
+            style={{ flex: 2, padding: '12px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', background: 'rgba(0,255,136,0.12)', border: '1px solid rgba(0,255,136,0.3)', color: '#00ff88', opacity: importing ? 0.6 : 1 }}>
+            {importing ? 'Importing...' : importStep === 'upload' ? 'Choose CSV File' : `Import ${importData.length} Contacts`}
           </button>
         </div>
       </div>
