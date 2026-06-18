@@ -4,12 +4,17 @@ import { AuthProvider } from '@/context/auth'
 
 export const metadata: Metadata = {
   title: 'Wave CRM — The CRM built for African businesses',
-  description: 'Manage leads, close deals and grow faster with Wave CRM. WhatsApp-first, AI-ready CRM built for businesses.',
+  description: 'Manage leads, close deals and grow faster with Wave CRM.',
   keywords: 'CRM, businesses, WhatsApp CRM, lead management',
   authors: [{ name: 'Wave Agency', url: 'https://waveagency.co.ke' }],
+  icons: {
+    icon: '/logo.webp',
+    apple: '/logo.webp',
+    shortcut: '/logo.webp',
+  },
   openGraph: {
     title: 'Wave CRM',
-    description: 'The CRM built for African businesses',
+    description: 'The CRM built for Businesses',
     url: 'https://wavecrm.co.ke',
     siteName: 'Wave CRM',
     locale: 'en_KE',
@@ -18,7 +23,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Wave CRM',
-    description: 'The CRM built for African businesses',
+    description: 'The CRM built for Businesses',
   },
   robots: {
     index: true,
