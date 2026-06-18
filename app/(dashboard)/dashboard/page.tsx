@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react'
 import Sidebar from '@/components/sidebar'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/auth'
+import {
+  Users, TrendingUp, DollarSign, CheckSquare,
+  MessageSquare, Megaphone, RefreshCw, BarChart2,
+  CheckCircle, Circle,
+} from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,7 +18,7 @@ type Stat = {
   value: string | number
   change: string
   color: string
-  icon: string
+  icon: React.ReactNode
 }
 
 type RecentLead = {
@@ -64,7 +69,6 @@ export default function DashboardPage() {
   const [pipelineOverview, setPipelineOverview] = useState<{ label: string; count: number; value: number; color: string }[]>([])
   const [isMobile,         setIsMobile]         = useState(false)
 
-  // Detect mobile
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
     check()
@@ -117,12 +121,12 @@ export default function DashboardPage() {
       const newContactsThisWeek = contacts.filter(c => new Date(c.created_at) > weekAgo).length
 
       setStats([
-        { label: 'Total Contacts',   value: contacts.length,                           change: `+${newContactsThisWeek} this week`,         color: '#818cf8', icon: '👥' },
-        { label: 'Active Leads',     value: leads.length,                              change: `${conversionRate}% conversion rate`,         color: '#38bdf8', icon: '📊' },
-        { label: 'Revenue (KES)',    value: `${(totalRevenue / 1000).toFixed(0)}K`,    change: `${convertedLeads.length} deals closed`,      color: '#00ff88', icon: '💰' },
-        { label: 'Tasks Due Today',  value: tasksDueToday,                             change: `${tasks.filter(t => t.done).length} done`,   color: '#fbbf24', icon: '✓' },
-        { label: 'Unread Messages',  value: unreadMessages,                            change: `${msgs.length} total messages`,              color: '#f97316', icon: '💬' },
-        { label: 'Campaigns Sent',   value: totalCampaignsSent,                        change: `${campaigns.length} campaigns`,              color: '#a78bfa', icon: '📣' },
+        { label: 'Total Contacts',  value: contacts.length,                           change: `+${newContactsThisWeek} this week`,        color: '#818cf8', icon: <Users      size={16} /> },
+        { label: 'Active Leads',    value: leads.length,                              change: `${conversionRate}% conversion rate`,        color: '#38bdf8', icon: <TrendingUp size={16} /> },
+        { label: 'Revenue (KES)',   value: `${(totalRevenue / 1000).toFixed(0)}K`,    change: `${convertedLeads.length} deals closed`,     color: '#00ff88', icon: <DollarSign size={16} /> },
+        { label: 'Tasks Due Today', value: tasksDueToday,                             change: `${tasks.filter(t => t.done).length} done`,  color: '#fbbf24', icon: <CheckSquare size={16} /> },
+        { label: 'Unread Messages', value: unreadMessages,                            change: `${msgs.length} total messages`,             color: '#f97316', icon: <MessageSquare size={16} /> },
+        { label: 'Campaigns Sent',  value: totalCampaignsSent,                        change: `${campaigns.length} campaigns`,             color: '#a78bfa', icon: <Megaphone  size={16} /> },
       ])
 
       const { data: recentLeadsData } = await supabase
@@ -146,8 +150,8 @@ export default function DashboardPage() {
         tasks.filter(t => t.due_date === 'Today' && !t.done).slice(0, 5).map(t => ({
           id:         t.id,
           title:      t.title,
-          priority:   t.priority   || 'medium',
-          dueDate:    t.due_date   || '',
+          priority:   t.priority    || 'medium',
+          dueDate:    t.due_date    || '',
           assignedTo: t.assigned_to || '',
           done:       t.done        || false,
         }))
@@ -175,7 +179,6 @@ export default function DashboardPage() {
     setTimeout(() => setTodayTasks(prev => prev.filter(t => t.id !== id)), 600)
   }
 
-  // Shared card style
   const card = {
     background: 'rgba(10,20,10,0.8)',
     border: '0.5px solid rgba(0,255,136,0.1)',
@@ -187,7 +190,6 @@ export default function DashboardPage() {
     <div style={{ minHeight: '100vh', background: '#080f08', color: 'white' }}>
       <Sidebar />
 
-      {/* Main content */}
       <div style={{
         marginLeft: isMobile ? 0 : '240px',
         padding: isMobile ? '72px 16px 24px' : '32px',
@@ -220,8 +222,10 @@ export default function DashboardPage() {
               color: 'rgba(255,255,255,0.4)',
               cursor: 'pointer', fontSize: '12px', fontWeight: 500,
               width: isMobile ? '100%' : 'auto',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
             }}
           >
+            <RefreshCw size={13} />
             Refresh
           </button>
         </div>
@@ -235,7 +239,7 @@ export default function DashboardPage() {
 
         {!loading && (
           <>
-            {/* ── Stats Grid — 2 cols on mobile, 3 on desktop ── */}
+            {/* ── Stats Grid ── */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
@@ -253,7 +257,16 @@ export default function DashboardPage() {
                     <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.35)' }}>
                       {stat.label}
                     </div>
-                    <span style={{ fontSize: '18px' }}>{stat.icon}</span>
+                    {/* Icon in a coloured circle */}
+                    <div style={{
+                      width: 30, height: 30, borderRadius: '8px',
+                      background: `${stat.color}18`,
+                      border: `1px solid ${stat.color}30`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: stat.color,
+                    }}>
+                      {stat.icon}
+                    </div>
                   </div>
                   <div style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: 700, color: stat.color, marginBottom: '6px' }}>
                     {stat.value}
@@ -265,7 +278,7 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {/* ── Main grid — stacked on mobile, 3-col on desktop ── */}
+            {/* ── Main grid ── */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
@@ -275,13 +288,16 @@ export default function DashboardPage() {
               {/* Recent Leads */}
               <div style={card}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Recent Leads</h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart2 size={15} color='rgba(255,255,255,0.5)' />
+                    <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Recent Leads</h2>
+                  </div>
                   <a href="/pipeline" style={{ fontSize: '12px', color: '#00ff88', textDecoration: 'none' }}>View all</a>
                 </div>
 
                 {recentLeads.length === 0 ? (
                   <div style={{ padding: '32px 0', textAlign: 'center' }}>
-                    <div style={{ fontSize: '28px', opacity: 0.2, marginBottom: '8px' }}>📊</div>
+                    <BarChart2 size={28} color='rgba(255,255,255,0.15)' style={{ margin: '0 auto 8px' }} />
                     <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>No leads yet</div>
                     <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', marginTop: '4px' }}>Add leads from the Pipeline page</div>
                   </div>
@@ -318,19 +334,22 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Right column — Tasks + Pipeline stacked */}
+              {/* Right column */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                 {/* Tasks Today */}
                 <div style={card}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Tasks Today</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <CheckSquare size={15} color='rgba(255,255,255,0.5)' />
+                      <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Tasks Today</h2>
+                    </div>
                     <a href="/tasks" style={{ fontSize: '12px', color: '#00ff88', textDecoration: 'none' }}>View all</a>
                   </div>
 
                   {todayTasks.length === 0 ? (
                     <div style={{ padding: '24px 0', textAlign: 'center' }}>
-                      <div style={{ fontSize: '24px', opacity: 0.2, marginBottom: '8px' }}>✓</div>
+                      <CheckCircle size={24} color='rgba(255,255,255,0.15)' style={{ margin: '0 auto 8px' }} />
                       <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>No tasks due today</div>
                     </div>
                   ) : (
@@ -339,12 +358,10 @@ export default function DashboardPage() {
                         <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)' }}>
                           <button
                             onClick={() => toggleTask(task.id)}
-                            style={{
-                              marginTop: '2px', width: 18, height: 18, borderRadius: '5px', flexShrink: 0,
-                              border: `1.5px solid ${priorityColors[task.priority] || '#00ff88'}`,
-                              background: 'transparent', cursor: 'pointer',
-                            }}
-                          />
+                            style={{ marginTop: '1px', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: priorityColors[task.priority] || '#00ff88', flexShrink: 0 }}
+                          >
+                            <Circle size={16} />
+                          </button>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '13px', fontWeight: 500, color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</div>
                             <div style={{ fontSize: '11px', marginTop: '2px', color: priorityColors[task.priority] || '#00ff88', textTransform: 'capitalize' }}>{task.priority} priority</div>
@@ -358,7 +375,10 @@ export default function DashboardPage() {
                 {/* Pipeline Overview */}
                 <div style={card}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Pipeline</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <TrendingUp size={15} color='rgba(255,255,255,0.5)' />
+                      <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'white', margin: 0 }}>Pipeline</h2>
+                    </div>
                     <a href="/pipeline" style={{ fontSize: '12px', color: '#00ff88', textDecoration: 'none' }}>View</a>
                   </div>
 
